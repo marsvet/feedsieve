@@ -1,0 +1,70 @@
+# Python cache and build files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Configuration files with secrets
+config/
+.env
+.env.local
+.env.production
+
+# Application data and logs
+data/
+*.log
+logs/
+
+# Development and testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.tox/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Documentation and development files
+docs/
+README.md
+*.md
+
+# Docker files (avoid recursive inclusion)
+Dockerfile*
+.dockerignore
+
+# Testing and development scripts
+test_*.sh
+test_*.py
+tests/
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+*.temp

@@ -1,0 +1,30 @@
+{
+  "name": "FeedSieve Development Environment",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  // Configure tool-specific properties
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "redhat.vscode-yaml",
+        "ms-python.debugpy",
+        "charliermarsh.ruff",
+        "eamodio.gitlens"
+      ]
+    }
+  },
+  // Use 'forwardPorts' to make a list of ports inside the container available locally
+  "forwardPorts": [
+    8000
+  ],
+  // Configure port attributes
+  "portsAttributes": {
+    "8000": {
+      "label": "FeedSieve Application",
+      "protocol": "http"
+    }
+  }
+}
