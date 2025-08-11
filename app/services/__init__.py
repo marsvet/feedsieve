@@ -8,6 +8,7 @@ Contains business logic services:
 - record_service: Record processing logic
 """
 
+from .content_fetcher_service import content_fetcher_service
 from .llm_service import LLMService
 from .queue_service import queue_service
 from .readwise_service import ReadwiseService
@@ -18,4 +19,5 @@ __all__ = [
     "queue_service",
     "ReadwiseService",
     "record_service",
+    "content_fetcher_service",
 ]

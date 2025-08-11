@@ -13,7 +13,7 @@ class LLMService:
     def __init__(self):
         self.api_key = config.get_api_config()["openrouter_key"]
         self.base_url = "https://openrouter.ai/api/v1"
-        self.model = "deepseek/deepseek-chat-v3-0324:free"
+        self.model = "moonshotai/kimi-k2:free"
 
     async def filter_content(
         self, title: str, content: str, source: str = "default"

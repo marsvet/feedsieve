@@ -90,17 +90,51 @@ export FEEDSIEVE_USERNAME="admin"
 export FEEDSIEVE_PASSWORD="secure_password"
 ```
 
+### 代理配置
+
+系统支持HTTP和SOCKS5代理，在 `config/secrets.yaml` 中配置：
+
+```yaml
+# 代理配置
+proxy:
+  type: "http"  # 或 "socks5"
+  url: "http://proxy:port"  # 或 "socks5://proxy:port"
+```
+
+**支持的代理类型**:
+- **HTTP代理**: 适用于大多数网络环境，配置简单
+- **SOCKS5代理**: 支持更多协议，需要安装PySocks依赖
+
+### 队列处理配置
+
+在 `config/config.yaml` 中配置队列处理参数：
+
+```yaml
+queue:
+  retry_times: 3                           # 重试次数
+  dead_letter_retry_daily: true            # 是否每日重试死信
+  process_interval_seconds: 300            # 队列处理间隔（秒）
+```
+
+**队列处理间隔说明**:
+- **默认值**: 300秒（5分钟）
+- **最小值**: 60秒（1分钟）
+- **建议值**: 300-600秒（5-10分钟），避免LLM API限流
+- **调整建议**: 根据LLM服务商的限流策略调整，避免触发频率限制
+
 ### Feed过滤配置
 
-在 `config/config.yaml` 中为每个feed源配置专门的过滤提示词：
+在 `config/config.yaml` 中为每个feed源配置专门的过滤提示词和内容抓取策略：
 
 ```yaml
 prompts:
   - site: ["rsshub://hackernews"]
+    refetch_content: true  # 是否重新抓取网页内容
     prompt: |
       你是Hacker News内容过滤器...
 
   - site: ["https://www.v2ex.com/index.xml"]
+    refetch_content: false  # 使用RSS原始内容，不重新抓取
     prompt: |
       你是V2EX内容过滤器...
 ```
@@ -146,18 +180,65 @@ Content-Type: application/json
 ```
 1. Webhook接收 → 验证数据 → 存入Queue表
          ↓
-2. 后台处理 → 获取Queue数据 → 匹配Prompt
+2. 后台处理 → 获取Queue数据 → 匹配Prompt配置
          ↓
-3. LLM判断 → 生成过滤结果
+3. 内容处理策略:
+   - refetch_content: true → 重新抓取网页内容（使用trafilatura）
+   - refetch_content: false → 使用RSS原始内容
          ↓
-4. 结果处理:
+4. 智能内容截断 → 保留前2500字符和后1000字符
+         ↓
+5. LLM判断 → 生成过滤结果
+         ↓
+6. 结果处理:
    - USEFUL: 发送到Readwise → Records表
    - USELESS: 被过滤 → Records表
    - SKIP: 无prompt → Records表
    - FAILED: 处理失败 → Records表（重试机制）
          ↓
-5. 清理 → 删除Queue表数据
+7. 清理 → 删除Queue表数据
 ```
+
+### 内容抓取配置
+
+每个feed源可以独立配置是否重新抓取网页内容：
+
+- **`refetch_content: true`**: 系统会访问原文链接，使用trafilatura库解析网页，提取纯文本内容
+- **`refetch_content: false`**: 系统直接使用RSS feed中的原始内容
+
+**优势对比**:
+- **重新抓取**: 获得完整、干净的网页内容，避免RSS摘要截断问题
+- **使用原始内容**: 处理速度更快，减少网络请求，适合内容质量较高的RSS源
+
+### 内容智能截断
+
+系统会自动对长文章进行智能截断处理，确保LLM能获得关键信息：
+
+- **截断策略**: 保留文章前2500字符和最后1000字符
+- **智能调整**: 根据文章长度自动调整截断参数
+- **阈值设置**: 3500字符以下不截断，超过则智能截断
+- **信息保留**: 优先保留文章开头和结尾，确保核心内容不丢失
+
+**截断示例**:
+```
+原始文章: 8000字符
+截断后: 前2500字符 + [截断提示] + 后1000字符 = 约3537字符
+压缩率: 55.8%
+```
+
+### Readwise集成
+
+系统会将有价值的文章保存到Readwise Reader：
+
+- **只传递文章URL**，让Readwise自动抓取和解析内容
+- 不传递标题、摘要、作者或HTML内容
+- 自动分类到"feed"位置，便于后续阅读和管理
+- 利用Readwise的智能内容解析能力，获得最佳阅读体验
+
+**集成优势**:
+- **内容质量**: Readwise专门优化的内容解析，去除广告和无关元素
+- **阅读体验**: 自动生成目录、高亮重要内容、支持多种阅读模式
+- **同步管理**: 与Readwise生态系统无缝集成，支持多设备同步
 
 ## 📁 项目结构
 
@@ -174,10 +255,11 @@ feedsieve/
 │   │   ├── database.py    # SQLAlchemy模型
 │   │   └── schemas.py     # Pydantic模型
 │   ├── services/          # 业务服务
-│   │   ├── queue_service.py    # 队列处理服务
-│   │   ├── record_service.py   # 记录管理服务
-│   │   ├── llm_service.py      # LLM调用服务
-│   │   └── readwise_service.py # Readwise集成服务
+│   │   ├── queue_service.py         # 队列处理服务
+│   │   ├── record_service.py        # 记录管理服务
+│   │   ├── llm_service.py           # LLM调用服务
+│   │   ├── readwise_service.py      # Readwise集成服务
+│   │   └── content_fetcher_service.py # 网页内容抓取服务
 │   ├── repositories/      # 数据访问层
 │   │   ├── queue_repository.py   # 队列数据访问
 │   │   └── record_repository.py  # 记录数据访问

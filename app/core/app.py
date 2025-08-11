@@ -25,14 +25,22 @@ logger = logging.getLogger(__name__)
 
 
 async def task_processor():
-    """后台任务处理循环"""
+    """后台任务处理循环 - 根据配置间隔处理队列项以避免LLM限流"""
+    from ..core.config import config
+
+    # 获取队列处理间隔配置
+    process_interval = config.get_queue_config().get("process_interval_seconds", 300)
+    error_wait_time = min(60, process_interval // 5)  # 错误时等待时间，不超过配置间隔的1/5
+
+    logger.info(f"队列处理间隔设置为: {process_interval}秒 ({process_interval//60}分钟)")
+
     while True:
         try:
             await queue_service.process_queue()
-            await asyncio.sleep(5)  # 每5秒检查一次
+            await asyncio.sleep(process_interval)
         except Exception as e:
             logger.error(f"任务处理循环异常: {e}")
-            await asyncio.sleep(10)  # 出错时等待更长时间
+            await asyncio.sleep(error_wait_time)
 
 
 @asynccontextmanager
@@ -64,7 +72,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="FeedSieve",
         description="内容过滤和管理系统",
-        version="1.0.0",
+        version="1.1.0",
         lifespan=lifespan,
         docs_url=None,  # 禁用 Swagger 文档
         redoc_url=None,  # 禁用 ReDoc 文档

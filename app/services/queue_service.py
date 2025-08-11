@@ -4,6 +4,7 @@ from app.core.config import config
 from app.core.constants import RecordStatus
 from app.core.logging import get_queue_logger
 from app.repositories.queue_repository import QueueRepository
+from app.services.content_fetcher_service import content_fetcher_service
 from app.services.llm_service import LLMService
 from app.services.readwise_service import ReadwiseService
 from app.services.record_service import record_service
@@ -91,14 +92,14 @@ class QueueService:
         try:
             # 1. 检查是否有对应的prompt
             prompts = config.get_prompts()
-            prompt = None
-            for url_pattern, prompt_text in prompts.items():
+            prompt_config = None
+            for url_pattern, config_data in prompts.items():
                 if any(pattern in feed_url for pattern in url_pattern):
-                    prompt = prompt_text
+                    prompt_config = config_data
                     break
 
-            if not prompt:
-                # 没有对应prompt，记录为SKIP
+            if not prompt_config:
+                # 没有对应prompt配置，记录为SKIP
                 await self.record_service.create_record(
                     feed_url=feed_url,
                     title=title,
@@ -107,15 +108,34 @@ class QueueService:
                     status=RecordStatus.SKIP,
                     error_message="没有对应的prompt配置"
                 )
-                queue_logger.info(f"没有对应prompt，已记录为SKIP: feed_url={feed_url}")
+                queue_logger.info(
+                    f"没有对应prompt配置，已记录为SKIP: feed_url={feed_url}")
 
                 return True
 
-            # 2. 使用LLM进行判断
+            # 2. 根据配置决定是否重新抓取内容
+            refetch_content = prompt_config.get("refetch_content", False)
+            final_content = content
+            if refetch_content:
+                queue_logger.info(f"配置为重新抓取内容，开始抓取: {article_url}")
+                fetched_content = await content_fetcher_service.fetch_content(article_url)
+                if fetched_content:
+                    final_content = fetched_content
+                    queue_logger.info(f"成功抓取新内容，长度: {len(fetched_content)} 字符")
+                else:
+                    queue_logger.warning(f"抓取内容失败，使用原始内容: {article_url}")
+            else:
+                queue_logger.info(f"配置为使用原始内容，跳过抓取: {article_url}")
+
+            # 3. 智能截断内容，保留前2500字符和后1000字符
+            final_content = self._smart_truncate_content(final_content, title)
+            queue_logger.info(f"内容截断后长度: {len(final_content)} 字符")
+
+            # 4. 使用LLM进行判断
             try:
                 filter_result = await self.llm_service.filter_content(
                     title=title,
-                    content=content,
+                    content=final_content,
                     source=feed_url,
                 )
 
@@ -124,11 +144,7 @@ class QueueService:
                     # 符合要求，发送到Readwise Reader
                     try:
                         readwise_id = await self.readwise_service.save_article(
-                            url=article_url,
-                            title=title,
-                            summary=filter_result.get("summary", ""),
-                            author="",
-                            html=content,
+                            url=article_url
                         )
 
                         # 记录有用的（符合要求，发送到Readwise）
@@ -221,6 +237,60 @@ class QueueService:
         except Exception as e:
             logger.error(f"清理队列失败: {e}")
             return 0
+
+    def _smart_truncate_content(self, content: str, title: str) -> str:
+        """
+        智能截断文章内容
+
+        保留文章前2500字符和最后1000字符，确保LLM能获得文章的开头和结尾关键信息
+
+        Args:
+            content: 原始文章内容
+            title: 文章标题
+
+        Returns:
+            截断后的内容
+        """
+        if not content:
+            return content
+
+        content_length = len(content)
+
+        # 如果内容长度小于等于3500字符，不需要截断
+        if content_length <= 3500:
+            return content
+
+        # 计算截断参数
+        front_length = 2500
+        back_length = 1000
+
+        # 如果内容太短，调整截断长度
+        if content_length < front_length + back_length:
+            # 内容长度不足，调整截断策略
+            if content_length <= 3000:
+                # 内容很短，只保留前80%
+                front_length = int(content_length * 0.8)
+                back_length = 0
+            else:
+                # 内容中等长度，平衡前后截断
+                front_length = int(content_length * 0.7)
+                back_length = content_length - front_length
+
+        # 执行截断
+        front_part = content[:front_length]
+        back_part = content[-back_length:] if back_length > 0 else ""
+
+        # 构建截断后的内容
+        if back_length > 0:
+            truncated_content = f"{front_part}\n\n... [内容已截断，保留前{front_length}字符和后{back_length}字符] ...\n\n{back_part}"
+        else:
+            truncated_content = f"{front_part}\n\n... [内容已截断，保留前{front_length}字符] ..."
+
+        # 记录截断信息
+        logger.info(
+            f"文章《{title}》内容截断: 原始长度{content_length}字符 -> 截断后{len(truncated_content)}字符")
+
+        return truncated_content
 
 
 # 全局队列服务实例

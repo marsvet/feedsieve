@@ -13,15 +13,8 @@ class ReadwiseService:
         self.api_token = config.get_api_config()["readwise_token"]
         self.base_url = "https://readwise.io/api/v3"
 
-    async def save_article(
-        self,
-        url: str,
-        title: str = None,
-        summary: str = None,
-        author: str = None,
-        html: str = None,
-    ) -> Optional[str]:
-        """保存文章到Readwise Reader"""
+    async def save_article(self, url: str) -> Optional[str]:
+        """保存文章到Readwise Reader，只传递URL让Readwise自动抓取内容"""
         try:
             headers = {
                 "Authorization": f"Token {self.api_token}",
@@ -30,20 +23,10 @@ class ReadwiseService:
 
             data = {
                 "url": url,
-                "location": "feed",  # 保存到feed
+                "location": "feed",  # 保存到feed位置
                 "category": "article",
                 "saved_using": "feedsieve",
             }
-
-            if title:
-                data["title"] = title
-            if summary:
-                data["summary"] = summary
-            if author:
-                data["author"] = author
-            if html:
-                data["html"] = html
-                data["should_clean_html"] = True
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(

@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 class PromptConfig(BaseModel):
     """单个Prompt配置"""
     site: List[str] = Field(..., description="网站URL列表")
+    refetch_content: bool = Field(default=False, description="是否重新抓取网页内容")
     prompt: str = Field(..., description="Prompt内容")
 
 
@@ -22,6 +23,8 @@ class QueueConfig(BaseModel):
     """队列配置"""
     retry_times: int = Field(default=3, ge=1, description="重试次数")
     dead_letter_retry_daily: bool = Field(default=True, description="是否每日重试死信")
+    process_interval_seconds: int = Field(
+        default=300, ge=60, description="队列处理间隔，单位：秒（最小60秒）")
 
 
 class DatabaseConfig(BaseModel):
@@ -149,14 +152,16 @@ class AppConfig(BaseModel):
         except Exception as e:
             raise RuntimeError(f"配置文件加载失败 {file_path}: {e}")
 
-    def get_prompts_dict(self) -> Dict[str, str]:
+    def get_prompts_dict(self) -> Dict[str, Dict[str, Any]]:
         """获取prompt内容，按site URL匹配"""
         prompts_dict = {}
 
         for item in self.prompts:
-            # 直接使用site列表作为key，prompt作为value
-            # 这样在匹配时可以检查feed_url是否在任何一个site列表中
-            prompts_dict[tuple(item.site)] = item.prompt
+            # 使用site列表作为key，包含prompt和refetch_content的字典作为value
+            prompts_dict[tuple(item.site)] = {
+                "prompt": item.prompt,
+                "refetch_content": item.refetch_content
+            }
 
         return prompts_dict
 
@@ -188,6 +193,7 @@ class AppConfig(BaseModel):
         return {
             "retry_times": self.queue.retry_times,
             "dead_letter_retry_daily": self.queue.dead_letter_retry_daily,
+            "process_interval_seconds": self.queue.process_interval_seconds,
         }
 
     def get_logging_dict(self) -> Dict[str, str]:
