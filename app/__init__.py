@@ -1,5 +1,5 @@
 """
-FeedSieve - Content filtering and management system
+feedsieve - Content filtering and management system
 
 A FastAPI-based application for filtering and managing content feeds
 from various sources like Hacker News and V2EX.

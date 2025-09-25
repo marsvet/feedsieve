@@ -4,12 +4,12 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import ValidationError
 
-from ..core.logging import get_webhook_logger
+from ..core.logging import get_logger
 from ..models.schemas import APIResponse, WebhookPayload
 from ..services.queue_service import queue_service
 
 logger = logging.getLogger(__name__)
-webhook_logger = get_webhook_logger()
+webhook_logger = get_logger("feedsieve.webhook")
 
 # 创建路由器
 router = APIRouter()

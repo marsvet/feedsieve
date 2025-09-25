@@ -33,17 +33,6 @@ class DatabaseConfig(BaseModel):
                      description="数据库连接URL")
 
 
-class LoggingFilesConfig(BaseModel):
-    """日志文件配置"""
-    app: str = Field(default="data/feedsieve.log", description="主应用日志文件")
-    error: str = Field(default="data/error.log", description="错误日志文件")
-    webhook: str = Field(default="data/webhook.log", description="Webhook日志文件")
-    queue: str = Field(default="data/queue.log", description="队列处理日志文件")
-    llm: str = Field(default="data/llm.log", description="LLM服务日志文件")
-    readwise: str = Field(default="data/readwise.log",
-                          description="Readwise服务日志文件")
-
-
 class LoggingConfig(BaseModel):
     """日志配置"""
     level: str = Field(default="INFO", description="日志级别")
@@ -51,8 +40,6 @@ class LoggingConfig(BaseModel):
         default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         description="日志格式"
     )
-    files: LoggingFilesConfig = Field(
-        default_factory=LoggingFilesConfig, description="日志文件配置")
 
 
 class AuthConfig(BaseModel):

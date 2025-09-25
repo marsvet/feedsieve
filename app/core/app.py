@@ -47,7 +47,7 @@ async def task_processor():
 async def lifespan(app: FastAPI):
     """应用程序生命周期管理"""
     # 启动时初始化
-    logger.info("正在启动 FeedSieve...")
+    logger.info("正在启动 feedsieve...")
 
     # 创建数据库表
     db.create_tables()
@@ -55,11 +55,11 @@ async def lifespan(app: FastAPI):
     # 启动任务处理循环
     asyncio.create_task(task_processor())
 
-    logger.info("FeedSieve 启动完成")
+    logger.info("feedsieve 启动完成")
     yield
 
     # 关闭时清理
-    logger.info("正在关闭 FeedSieve...")
+    logger.info("正在关闭 feedsieve...")
 
 
 def create_app() -> FastAPI:
@@ -70,7 +70,7 @@ def create_app() -> FastAPI:
 
     # 创建应用程序实例 (禁用文档端点)
     app = FastAPI(
-        title="FeedSieve",
+        title="feedsieve",
         description="内容过滤和管理系统",
         version="1.1.0",
         lifespan=lifespan,

@@ -1,6 +1,6 @@
 > 注意：本项目 95% 的代码都由 AI 编写，没有完整审计过代码，只测试了基本功能，因此完全不可信。
 
-# FeedSieve
+# feedsieve
 
 智能RSS内容过滤系统 - 使用LLM智能筛选RSS订阅内容，并将有价值的文章自动保存到Readwise Reader。
 
@@ -12,7 +12,7 @@
 - 📚 **Readwise集成**: 自动将有价值的内容发送到Readwise Reader保存
 - 📊 **完整记录**: 记录所有处理结果（有用/无用/失败/跳过）
 - 🔁 **重试机制**: 处理失败时自动重试，最多3次
-- 📝 **分类日志**: 按功能模块分类记录日志，便于调试和监控
+- 📝 **统一日志**: 所有日志统一输出到控制台和文件，便于调试和监控
 
 ## 🚀 快速开始
 
@@ -50,9 +50,9 @@
 5. **验证服务**:
    ```bash
    # 服务启动后，应该看到以下输出：
-   # INFO - 正在启动 FeedSieve...
+   # INFO - 正在启动 feedsieve...
    # INFO - 数据库表创建成功
-   # INFO - FeedSieve 启动完成
+   # INFO - feedsieve 启动完成
    # INFO - Application startup complete.
    ```
 
@@ -271,32 +271,24 @@ feedsieve/
 │   ├── secrets.yaml     # 敏感配置
 ├── data/                # 数据目录
 │   ├── feedsieve.db     # SQLite数据库
-│   └── *.log           # 各种日志文件
+│   └── feedsieve.log    # 应用日志文件
 ├── main.py             # 应用入口
 └── pyproject.toml      # Poetry配置
 ```
 
 ## 📝 日志系统
 
-系统按功能模块生成分类日志：
+系统统一输出日志到控制台和文件：
 
 ```bash
 data/
-├── feedsieve.log      # 主应用日志
-├── error.log          # 错误日志
-├── webhook.log        # Webhook接收日志
-├── queue.log          # 队列处理日志
-├── llm.log            # LLM调用日志
-└── readwise.log       # Readwise保存日志
+└── feedsieve.log      # 应用日志文件
 ```
 
 ### 实时监控日志
 ```bash
-# 监控特定功能日志
-tail -f data/webhook.log    # Webhook接收
-tail -f data/queue.log      # 队列处理
-tail -f data/llm.log        # LLM过滤
-tail -f data/readwise.log   # Readwise保存
+# 监控应用日志
+tail -f data/feedsieve.log
 ```
 
 ## 💾 数据库
@@ -348,7 +340,7 @@ GROUP BY status;
 
 2. **API密钥错误**:
    - 检查 `config/secrets.yaml` 配置
-   - 查看 `data/llm.log` 获取详细错误
+   - 查看 `data/feedsieve.log` 获取详细错误
 
 3. **配置文件问题**:
    ```bash

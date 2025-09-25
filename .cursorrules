@@ -1,0 +1,82 @@
+# Cursor Rules for feedsieve project
+
+## Project Naming Convention
+- **项目名称**: 始终使用全小写的 "feedsieve"，避免使用驼峰式命名如 "FeedSieve"
+- **一致性**: 在整个代码库中保持项目名称的一致性
+
+## 技术栈
+- Python 3.10+
+- FastAPI
+- SQLite
+- Poetry
+- Docker (Alpine-based)
+
+## 项目结构
+
+### 根目录结构
+```
+feedsieve/
+├── app/                    # 主应用代码
+├── config/                 # 配置文件
+├── data/                   # 数据文件
+├── Dockerfile             # Docker 配置
+├── main.py                # 应用入口
+├── poetry.lock            # 依赖锁定文件
+├── pyproject.toml         # Poetry 配置
+├── README.md              # 项目文档
+└── .cursorrules           # Cursor 规则文件
+```
+
+### app/ 目录结构
+```
+app/
+├── controllers/           # 控制器层
+├── core/                  # 核心组件
+│   ├── app.py            # 应用工厂
+│   ├── config.py         # 配置管理
+│   ├── constants.py      # 常量定义
+│   ├── database.py       # 数据库管理
+│   ├── dependencies.py   # 依赖注入
+│   ├── logging.py        # 日志配置
+│   └── settings.py       # 设置模型
+├── middleware/            # 中间件（CORS、错误处理、日志、Webhook保护）
+├── models/               # 数据模型（SQLAlchemy 和 Pydantic 模型）
+├── repositories/         # 数据访问层
+└── services/             # 业务服务层
+```
+
+### config/ 目录结构
+```
+config/
+├── config.yaml           # 主配置文件（非敏感）
+└── secrets.yaml          # 敏感配置文件
+```
+
+### data/ 目录结构
+```
+data/
+├── feedsieve.db          # SQLite 数据库
+└── feedsieve.log         # 应用日志文件
+```
+
+## 架构模式
+
+### 分层架构
+- **控制器层** (`controllers/`): 处理 HTTP 请求和响应
+- **服务层** (`services/`): 业务逻辑处理
+- **仓储层** (`repositories/`): 数据访问抽象
+- **模型层** (`models/`): 数据模型定义
+- **中间件层** (`middleware/`): 横切关注点
+
+### 核心功能
+- **内容过滤和管理系统**: 基于 LLM 的智能内容筛选
+- **Readwise Reader 集成**: 自动保存有价值的文章
+- **Webhook 接收和处理**: 实时处理 RSS 内容推送
+- **异步队列处理**: 基于 SQLite 的队列系统
+- **统一日志系统**: 所有日志统一输出到控制台和文件
+
+### 文件命名规范
+- **Python 文件**: 使用下划线命名法 (`snake_case`)
+- **配置文件**: 使用 YAML 格式
+- **日志文件**: 统一使用 feedsieve.log
+- **数据库文件**: 使用项目名称前缀

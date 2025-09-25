@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FeedSieve - Content filtering and management system
+feedsieve - Content filtering and management system
 Main application entry point
 
 Author: Terry Ma <terry.o.ma@outlook.com>

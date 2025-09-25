@@ -74,7 +74,7 @@ class LLMService:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://feedsieve.local",
-            "X-Title": "FeedSieve",
+            "X-Title": "feedsieve",
         }
 
         data = {

@@ -2,7 +2,7 @@ import logging
 
 from app.core.config import config
 from app.core.constants import RecordStatus
-from app.core.logging import get_queue_logger
+from app.core.logging import get_logger
 from app.repositories.queue_repository import QueueRepository
 from app.services.content_fetcher_service import content_fetcher_service
 from app.services.llm_service import LLMService
@@ -10,7 +10,7 @@ from app.services.readwise_service import ReadwiseService
 from app.services.record_service import record_service
 
 logger = logging.getLogger(__name__)
-queue_logger = get_queue_logger()
+queue_logger = get_logger("feedsieve.queue")
 
 
 class QueueService:
