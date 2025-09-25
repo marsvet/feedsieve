@@ -35,11 +35,15 @@ class Config:
         """获取API配置"""
         return self._app_config.get_api_dict()
 
+    def get_llm_config(self) -> Dict[str, Any]:
+        """获取LLM配置"""
+        return self._app_config.get_llm_dict()
+
     def get_proxy_config(self) -> Optional[Dict[str, str]]:
         """获取代理配置"""
         return self._app_config.get_proxy_dict()
 
-    def get_prompts(self) -> Dict[str, str]:
+    def get_prompts(self) -> Dict[str, Dict[str, Any]]:
         """获取prompt内容，按site匹配"""
         return self._app_config.get_prompts_dict()
 

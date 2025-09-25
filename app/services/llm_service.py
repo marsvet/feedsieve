@@ -11,26 +11,51 @@ logger = logging.getLogger(__name__)
 
 class LLMService:
     def __init__(self):
-        self.api_key = config.get_api_config()["openrouter_key"]
-        self.base_url = "https://openrouter.ai/api/v1"
-        self.model = "moonshotai/kimi-k2:free"
+        # 获取LLM配置
+        llm_config = config.get_llm_config()
+
+        # 过滤启用的endpoints
+        self.endpoints = [
+            endpoint for endpoint in llm_config["endpoints"]
+            if endpoint.get("enabled", True)
+        ]
+
+        if not self.endpoints:
+            raise ValueError("没有启用的LLM endpoints")
+
+        # 轮询索引
+        self.current_index = 0
+
+        logger.info(f"LLM服务初始化完成，支持 {len(self.endpoints)} 个endpoints")
+
+    def _get_next_endpoint(self) -> Dict[str, Any]:
+        """获取下一个endpoint（轮询）"""
+        if not self.endpoints:
+            raise ValueError("没有可用的endpoints")
+
+        endpoint = self.endpoints[self.current_index]
+        self.current_index = (self.current_index + 1) % len(self.endpoints)
+        return endpoint
 
     async def filter_content(
         self, title: str, content: str, source: str = "default"
     ) -> Dict[str, Any]:
         """使用LLM过滤内容"""
         try:
+            # 选择endpoint
+            endpoint = self._get_next_endpoint()
+
             # 构建prompt
             prompt = self._build_prompt(title, content, source)
 
-            # 调用OpenRouter API
-            response = await self._call_openrouter(prompt)
+            # 调用LLM API
+            response = await self._call_llm_api(prompt, endpoint)
 
             # 解析响应
             result = self._parse_response(response)
 
             logger.info(
-                f"LLM过滤完成 - 标题: {title}, 结果: {result.get('useful', False)}"
+                f"LLM过滤完成 - endpoint: {endpoint['name']}, 标题: {title}, 结果: {result.get('useful', False)}"
             )
             return result
 
@@ -50,16 +75,16 @@ class LLMService:
         base_prompt = None
 
         # 在prompt配置中查找匹配的feed URL
-        for url_patterns, prompt_text in prompts.items():
+        for url_patterns, prompt_config in prompts.items():
             if any(pattern in source for pattern in url_patterns):
-                base_prompt = prompt_text
+                base_prompt = prompt_config["prompt"]
                 break
 
         if not base_prompt:
             logger.warning(f"未找到来源 {source} 的prompt配置，使用默认prompt")
             # 使用第一个可用的prompt作为默认
             if prompts:
-                base_prompt = list(prompts.values())[0]
+                base_prompt = list(prompts.values())[0]["prompt"]
             else:
                 base_prompt = "请分析以下内容是否有价值。"
 
@@ -87,51 +112,95 @@ class LLMService:
 
         return full_prompt
 
-    async def _call_openrouter(self, prompt: str) -> str:
-        """调用OpenRouter API"""
+    async def _call_llm_api(self, prompt: str, endpoint: Dict[str, Any]) -> str:
+        """调用LLM API"""
+        headers = self._get_headers(endpoint)
+        data = self._get_request_data(prompt, endpoint)
+
+        for attempt in range(endpoint["max_retries"] + 1):
+            try:
+                async with httpx.AsyncClient(timeout=endpoint["timeout"]) as client:
+                    response = await client.post(
+                        f"{endpoint['base_url']}/chat/completions",
+                        headers=headers,
+                        json=data
+                    )
+
+                    if response.status_code != 200:
+                        error_msg = f"LLM API调用失败: {response.status_code} - {response.text}"
+                        if attempt < endpoint["max_retries"]:
+                            logger.warning(
+                                f"第{attempt + 1}次尝试失败，将重试: {error_msg}")
+                            continue
+                        else:
+                            raise Exception(error_msg)
+
+                    result = response.json()
+                    logger.debug(f"LLM API响应: {result}")
+
+                    # 检查响应格式
+                    if "choices" not in result:
+                        logger.error(f"API响应中缺少choices字段: {result}")
+                        raise Exception(f"API响应格式错误，缺少choices字段: {result}")
+
+                    if not result["choices"]:
+                        logger.error(f"API响应中choices为空: {result}")
+                        raise Exception(f"API响应中choices为空: {result}")
+
+                    if "message" not in result["choices"][0]:
+                        logger.error(f"API响应中缺少message字段: {result}")
+                        raise Exception(f"API响应中缺少message字段: {result}")
+
+                    return result["choices"][0]["message"]["content"]
+
+            except httpx.TimeoutException:
+                if attempt < endpoint["max_retries"]:
+                    logger.warning(f"第{attempt + 1}次尝试超时，将重试")
+                    continue
+                else:
+                    raise Exception(
+                        f"LLM API调用超时，已重试{endpoint['max_retries']}次")
+            except Exception as e:
+                if attempt < endpoint["max_retries"]:
+                    logger.warning(f"第{attempt + 1}次尝试失败，将重试: {e}")
+                    continue
+                else:
+                    raise e
+
+    def _get_headers(self, endpoint: Dict[str, Any]) -> Dict[str, str]:
+        """获取请求头"""
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {endpoint['api_key']}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://feedsieve.local",
-            "X-Title": "feedsieve",
         }
 
-        data = {
-            "model": self.model,
+        # 根据提供商添加特定的请求头
+        provider = endpoint["provider"]
+        if provider == "openrouter":
+            headers.update({
+                "HTTP-Referer": "https://feedsieve.local",
+                "X-Title": "feedsieve",
+            })
+        elif provider == "openai":
+            # OpenAI 不需要额外头部
+            pass
+        elif provider == "anthropic":
+            # Anthropic 使用不同的API格式，这里暂时不支持
+            pass
+        elif provider == "custom":
+            # 自定义提供商，可以根据需要添加头部
+            pass
+
+        return headers
+
+    def _get_request_data(self, prompt: str, endpoint: Dict[str, Any]) -> Dict[str, Any]:
+        """获取请求数据"""
+        return {
+            "model": endpoint["model"],
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.1,
-            "max_tokens": 1000,
+            "temperature": endpoint["temperature"],
+            "max_tokens": endpoint["max_tokens"],
         }
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{self.base_url}/chat/completions", headers=headers, json=data
-            )
-
-            if response.status_code != 200:
-                raise Exception(
-                    f"OpenRouter API调用失败: {response.status_code} - {response.text}"
-                )
-
-            result = response.json()
-
-            # 调试：打印完整响应
-            logger.debug(f"OpenRouter API响应: {result}")
-
-            # 检查响应格式
-            if "choices" not in result:
-                logger.error(f"API响应中缺少choices字段: {result}")
-                raise Exception(f"API响应格式错误，缺少choices字段: {result}")
-
-            if not result["choices"]:
-                logger.error(f"API响应中choices为空: {result}")
-                raise Exception(f"API响应中choices为空: {result}")
-
-            if "message" not in result["choices"][0]:
-                logger.error(f"API响应中缺少message字段: {result}")
-                raise Exception(f"API响应中缺少message字段: {result}")
-
-            return result["choices"][0]["message"]["content"]
 
     def _parse_response(self, response: str) -> Dict[str, Any]:
         """解析LLM响应"""
@@ -162,3 +231,20 @@ class LLMService:
                 "summary": "解析失败",
                 "title": "未知",
             }
+
+    def get_status(self) -> Dict[str, Any]:
+        """获取LLM服务状态"""
+        return {
+            "total_endpoints": len(self.endpoints),
+            "enabled_endpoints": len([ep for ep in self.endpoints if ep.get("enabled", True)]),
+            "current_index": self.current_index,
+            "endpoints": [
+                {
+                    "name": ep["name"],
+                    "provider": ep["provider"],
+                    "model": ep["model"],
+                    "enabled": ep.get("enabled", True)
+                }
+                for ep in self.endpoints
+            ]
+        }

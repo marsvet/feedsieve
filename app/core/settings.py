@@ -48,6 +48,26 @@ class AuthConfig(BaseModel):
     password: str = Field(..., description="密码")
 
 
+class LLMEndpointConfig(BaseModel):
+    """单个LLM endpoint配置"""
+    name: str = Field(..., description="endpoint名称")
+    provider: str = Field(..., description="LLM服务提供商")
+    api_key: str = Field(..., description="API密钥")
+    base_url: str = Field(..., description="API基础URL")
+    model: str = Field(..., description="模型名称")
+    timeout: int = Field(default=30, ge=1, description="请求超时时间（秒）")
+    max_retries: int = Field(default=3, ge=0, description="最大重试次数")
+    temperature: float = Field(default=0.1, ge=0.0, le=2.0, description="温度参数")
+    max_tokens: int = Field(default=1000, ge=1, description="最大token数")
+    enabled: bool = Field(default=True, description="是否启用此endpoint")
+
+
+class LLMConfig(BaseModel):
+    """LLM配置"""
+    endpoints: List[LLMEndpointConfig] = Field(
+        ..., description="LLM endpoints列表")
+
+
 class ApiConfig(BaseModel):
     """API配置"""
     openrouter_key: str = Field(..., description="OpenRouter API密钥")
@@ -75,6 +95,7 @@ class SecretsConfig(BaseModel):
     """敏感信息配置模型"""
     auth: AuthConfig = Field(..., description="认证配置")
     api: ApiConfig = Field(..., description="API配置")
+    llm: LLMConfig = Field(..., description="LLM配置")
     proxy: Optional[ProxyConfig] = Field(default=None, description="代理配置")
 
 
@@ -92,6 +113,7 @@ class AppConfig(BaseModel):
     # 敏感信息配置
     auth: AuthConfig = Field(..., description="认证配置")
     api: ApiConfig = Field(..., description="API配置")
+    llm: LLMConfig = Field(..., description="LLM配置")
     proxy: Optional[ProxyConfig] = Field(default=None, description="代理配置")
 
     @classmethod
@@ -164,6 +186,26 @@ class AppConfig(BaseModel):
         return {
             "openrouter_key": self.api.openrouter_key,
             "readwise_token": self.api.readwise_token,
+        }
+
+    def get_llm_dict(self) -> Dict[str, Any]:
+        """获取LLM配置字典"""
+        return {
+            "endpoints": [
+                {
+                    "name": endpoint.name,
+                    "provider": endpoint.provider,
+                    "api_key": endpoint.api_key,
+                    "base_url": endpoint.base_url,
+                    "model": endpoint.model,
+                    "timeout": endpoint.timeout,
+                    "max_retries": endpoint.max_retries,
+                    "temperature": endpoint.temperature,
+                    "max_tokens": endpoint.max_tokens,
+                    "enabled": endpoint.enabled,
+                }
+                for endpoint in self.llm.endpoints
+            ]
         }
 
     def get_proxy_dict(self) -> Optional[Dict[str, str]]:

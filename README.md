@@ -7,6 +7,8 @@
 ## ✨ 功能特性
 
 - 🤖 **智能内容过滤**: 基于自定义提示词，使用LLM智能判断内容价值
+- 🔧 **多LLM支持**: 支持OpenRouter、OpenAI、自定义LLM服务等多种提供商
+- ⚖️ **轮询负载均衡**: 支持配置多个LLM endpoints，自动轮询调用
 - 📡 **Webhook接收**: 接收RSS服务的webhook推送，实时处理新内容
 - 🔄 **异步队列处理**: 基于SQLite的队列系统，一个一个处理内容，确保稳定性
 - 📚 **Readwise集成**: 自动将有价值的内容发送到Readwise Reader保存
@@ -20,7 +22,7 @@
 
 - Python 3.10+
 - Poetry（依赖管理）
-- OpenRouter API密钥（LLM服务）
+- LLM服务API密钥（支持OpenRouter、OpenAI、自定义服务等）
 - Readwise Token（用于保存文章）
 
 ### 安装步骤
@@ -79,6 +81,43 @@ auth:
 api:
   openrouter_key: "${OPENROUTER_API_KEY:-your_openrouter_key_here}"
   readwise_token: "${READWISE_TOKEN:-your_readwise_token_here}"
+
+# LLM配置
+llm:
+  # LLM endpoints列表（支持多个endpoints轮询）
+  endpoints:
+    - name: "grok-4-fast"
+      provider: "openrouter"
+      api_key: "sk-or-v1-..."
+      base_url: "https://openrouter.ai/api/v1"
+      model: "x-ai/grok-4-fast:free"
+      timeout: 30
+      max_retries: 3
+      temperature: 0.1
+      max_tokens: 1000
+      enabled: true
+
+    - name: "qwen3-coder"
+      provider: "openrouter"
+      api_key: "sk-or-v1-..."
+      base_url: "https://openrouter.ai/api/v1"
+      model: "qwen/qwen3-coder:free"
+      timeout: 30
+      max_retries: 3
+      temperature: 0.1
+      max_tokens: 1000
+      enabled: true
+
+    - name: "gemini-2-flash"
+      provider: "openrouter"
+      api_key: "sk-or-v1-..."
+      base_url: "https://openrouter.ai/api/v1"
+      model: "google/gemini-2.0-flash-exp:free"
+      timeout: 30
+      max_retries: 3
+      temperature: 0.1
+      max_tokens: 1000
+      enabled: true
 ```
 
 ### 环境变量（推荐生产环境）
@@ -104,6 +143,96 @@ proxy:
 **支持的代理类型**:
 - **HTTP代理**: 适用于大多数网络环境，配置简单
 - **SOCKS5代理**: 支持更多协议，需要安装PySocks依赖
+
+### LLM服务配置
+
+系统支持多种LLM服务提供商和轮询负载均衡，在 `config/secrets.yaml` 中配置：
+
+#### 基本配置结构
+```yaml
+llm:
+  # LLM endpoints列表（支持多个endpoints轮询）
+  endpoints:
+    - name: "endpoint名称"
+      provider: "openrouter"  # 支持: openrouter, openai, anthropic, custom
+      api_key: "your_api_key"
+      base_url: "https://api.example.com/v1"
+      model: "model_name"
+      timeout: 30
+      max_retries: 3
+      temperature: 0.1
+      max_tokens: 1000
+      enabled: true
+```
+
+#### 多endpoint配置示例
+
+**示例1：多个OpenRouter endpoints（推荐）**
+```yaml
+llm:
+  endpoints:
+    - name: "grok-4-fast"
+      provider: "openrouter"
+      api_key: "sk-or-v1-..."
+      base_url: "https://openrouter.ai/api/v1"
+      model: "x-ai/grok-4-fast:free"
+      enabled: true
+    - name: "qwen3-coder"
+      provider: "openrouter"
+      api_key: "sk-or-v1-..."
+      base_url: "https://openrouter.ai/api/v1"
+      model: "qwen/qwen3-coder:free"
+      enabled: true
+    - name: "gemini-2-flash"
+      provider: "openrouter"
+      api_key: "sk-or-v1-..."
+      base_url: "https://openrouter.ai/api/v1"
+      model: "google/gemini-2.0-flash-exp:free"
+      enabled: true
+```
+
+**示例2：混合提供商配置**
+```yaml
+llm:
+  endpoints:
+    - name: "grok-4-fast"
+      provider: "openrouter"
+      api_key: "sk-or-v1-..."
+      base_url: "https://openrouter.ai/api/v1"
+      model: "x-ai/grok-4-fast:free"
+      enabled: true
+    - name: "openai-backup"
+      provider: "openai"
+      api_key: "sk-..."
+      base_url: "https://api.openai.com/v1"
+      model: "gpt-3.5-turbo"
+      enabled: true
+    - name: "custom-llm"
+      provider: "custom"
+      api_key: "your-custom-key"
+      base_url: "https://your-llm-service.com/v1"
+      model: "your-model"
+      enabled: false  # 暂时禁用
+```
+
+#### 轮询机制
+
+- **自动轮询**: 系统会按顺序轮流使用各个启用的endpoints
+- **简单高效**: 无需复杂的健康检查，直接轮询调用
+- **故障容错**: 单个endpoint失败不影响其他endpoints的使用
+- **负载分散**: 多个endpoints可以分散API调用压力
+
+**配置参数说明**:
+- **`name`**: endpoint名称（唯一标识）
+- **`provider`**: LLM服务提供商（openrouter/openai/anthropic/custom）
+- **`api_key`**: API密钥
+- **`base_url`**: API基础URL
+- **`model`**: 模型名称
+- **`timeout`**: 请求超时时间（秒）
+- **`max_retries`**: 最大重试次数
+- **`temperature`**: 温度参数（0.0-2.0）
+- **`max_tokens`**: 最大token数
+- **`enabled`**: 是否启用此endpoint
 
 ### 队列处理配置
 
