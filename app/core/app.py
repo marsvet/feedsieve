@@ -72,7 +72,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="feedsieve",
         description="内容过滤和管理系统",
-        version="1.1.0",
+        version="1.2.0",
         lifespan=lifespan,
         docs_url=None,  # 禁用 Swagger 文档
         redoc_url=None,  # 禁用 ReDoc 文档

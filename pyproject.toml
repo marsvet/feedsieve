@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "feedsieve"
-version = "1.1.0"
+version = "1.2.0"
 description = "Content filtering and management system for feeds"
 authors = ["Terry Ma <terry.o.ma@outlook.com>"]
 readme = "README.md"
