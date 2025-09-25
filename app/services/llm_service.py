@@ -64,7 +64,26 @@ class LLMService:
                 base_prompt = "请分析以下内容是否有价值。"
 
         # 构建完整prompt
-        full_prompt = f"{base_prompt}\n\n请分析以下内容：\n标题：{title}\n内容：{content}\n\n请返回JSON格式的结果。"
+        full_prompt = f"""{base_prompt}
+
+请分析以下内容：
+标题：{title}
+内容：{content}
+
+请严格按照以下JSON格式返回结果：
+{{
+  "title": "文章标题",
+  "summary": "文章核心内容摘要（1-2句话）",
+  "useful": true,  // true=保留，false=过滤掉
+  "reason": "保留/过滤的具体原因"
+}}
+
+注意：
+- 必须返回有效的JSON格式
+- useful字段必须是布尔值（true或false）
+- summary字段应该是1-2句话的简洁摘要
+- reason字段应该说明判断的具体原因
+- 不要包含任何其他文本，只返回JSON"""
 
         return full_prompt
 
