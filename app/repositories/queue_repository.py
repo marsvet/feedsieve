@@ -13,6 +13,16 @@ logger = logging.getLogger(__name__)
 class QueueRepository(BaseRepository):
     """队列数据访问层"""
 
+    def exists_by_url(self, article_url: str) -> bool:
+        """检查URL是否已存在于队列中"""
+        session = self.get_session()
+        try:
+            return session.query(Queue).filter(
+                Queue.article_url == article_url
+            ).first() is not None
+        finally:
+            self.close_session(session)
+
     def add_to_queue(
         self, feed_url: str, title: str, content: str, article_url: str
     ) -> int:

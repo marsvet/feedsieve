@@ -13,6 +13,16 @@ logger = logging.getLogger(__name__)
 class RecordRepository(BaseRepository):
     """记录数据访问层"""
 
+    def exists_by_url(self, article_url: str) -> bool:
+        """检查URL是否已存在于记录中"""
+        session = self.get_session()
+        try:
+            return session.query(Record).filter(
+                Record.article_url == article_url
+            ).first() is not None
+        finally:
+            self.close_session(session)
+
     def create_record(
         self,
         feed_url: str,

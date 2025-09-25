@@ -24,8 +24,18 @@ class QueueService:
         self.retry_times = config.get_queue_config()["retry_times"]
 
     async def add_to_queue(self, feed_url: str, title: str, content: str, article_url: str) -> int:
-        """添加数据到队列"""
+        """添加数据到队列（带去重检查）"""
         try:
+            # 检查URL是否已存在于队列或记录中
+            if self.queue_repository.exists_by_url(article_url):
+                queue_logger.info(f"URL已存在于队列中，跳过添加: {article_url}")
+                return 0
+
+            if self.record_service.repository.exists_by_url(article_url):
+                queue_logger.info(f"URL已存在于记录中，跳过添加: {article_url}")
+                return 0
+
+            # URL不重复，添加到队列
             queue_id = self.queue_repository.add_to_queue(
                 feed_url=feed_url,
                 title=title,
@@ -33,14 +43,14 @@ class QueueService:
                 article_url=article_url
             )
             queue_logger.info(
-                f"数据已添加到队列: queue_id={queue_id}, feed_url={feed_url}")
+                f"数据已添加到队列: queue_id={queue_id}, feed_url={feed_url}, article_url={article_url}")
             return queue_id
         except Exception as e:
             queue_logger.error(f"添加数据到队列失败: {e}")
             raise
 
     async def process_queue(self) -> int:
-        """处理队列中的数据 - 一个一个处理"""
+        """处理队列中的数据 - 一个一个处理（带去重检查）"""
         try:
             # 只获取一个待处理的项目
             queue_item = self.queue_repository.get_next_pending_item()
@@ -51,6 +61,13 @@ class QueueService:
             queue_logger.info(
                 f"开始处理队列项: id={queue_item.id}, feed_url={queue_item.feed_url}")
 
+            # 处理前再次检查去重（防止处理期间有重复数据）
+            if self.record_service.repository.exists_by_url(queue_item.article_url):
+                queue_logger.info(
+                    f"URL已存在于记录中，跳过处理并删除队列项: {queue_item.article_url}")
+                self.queue_repository.delete_queue_item(queue_item.id)
+                return 1
+
             # 处理单个项目
             success = await self._process_single_item(queue_item)
 
@@ -59,20 +76,9 @@ class QueueService:
                 self.queue_repository.delete_queue_item(queue_item.id)
                 queue_logger.info(f"队列项处理完成并已删除: id={queue_item.id}")
             else:
-                # 处理失败，检查重试次数
-                if queue_item.retry_count < queue_item.max_retries:
-                    # 增加重试次数
-                    self.queue_repository.update_queue_status(
-                        queue_item.id,
-                        status="pending",
-                        retry_count=queue_item.retry_count + 1
-                    )
-                    queue_logger.info(
-                        f"将重试队列项: id={queue_item.id}, 重试次数={queue_item.retry_count + 1}")
-                else:
-                    # 达到最大重试次数，删除队列项
-                    self.queue_repository.delete_queue_item(queue_item.id)
-                    queue_logger.error(f"达到最大重试次数，已删除: id={queue_item.id}")
+                # 处理失败，直接删除队列项（简化处理，避免复杂的重试逻辑）
+                self.queue_repository.delete_queue_item(queue_item.id)
+                queue_logger.error(f"队列项处理失败，已删除: id={queue_item.id}")
 
             return 1
 

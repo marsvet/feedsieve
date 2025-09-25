@@ -11,6 +11,7 @@
 - ⚖️ **轮询负载均衡**: 支持配置多个LLM endpoints，自动轮询调用
 - 📡 **Webhook接收**: 接收RSS服务的webhook推送，实时处理新内容
 - 🔄 **异步队列处理**: 基于SQLite的队列系统，一个一个处理内容，确保稳定性
+- 🚫 **智能去重**: 基于URL的重复检测，避免处理重复内容
 - 📚 **Readwise集成**: 自动将有价值的内容发送到Readwise Reader保存
 - 📊 **完整记录**: 记录所有处理结果（有用/无用/失败/跳过）
 - 🔁 **重试机制**: 处理失败时自动重试，最多3次
@@ -242,13 +243,13 @@ llm:
 queue:
   retry_times: 3                           # 重试次数
   dead_letter_retry_daily: true            # 是否每日重试死信
-  process_interval_seconds: 300            # 队列处理间隔（秒）
+  process_interval_seconds: 120            # 队列处理间隔（秒）
 ```
 
 **队列处理间隔说明**:
-- **默认值**: 300秒（5分钟）
+- **默认值**: 120秒（2分钟）
 - **最小值**: 60秒（1分钟）
-- **建议值**: 300-600秒（5-10分钟），避免LLM API限流
+- **建议值**: 120-300秒（2-5分钟），平衡处理速度和API限流
 - **调整建议**: 根据LLM服务商的限流策略调整，避免触发频率限制
 
 ### Feed过滤配置
@@ -307,9 +308,9 @@ Content-Type: application/json
 ## 📊 处理流程
 
 ```
-1. Webhook接收 → 验证数据 → 存入Queue表
+1. Webhook接收 → 验证数据 → URL去重检查 → 存入Queue表
          ↓
-2. 后台处理 → 获取Queue数据 → 匹配Prompt配置
+2. 后台处理 → 获取Queue数据 → URL去重检查 → 匹配Prompt配置
          ↓
 3. 内容处理策略:
    - refetch_content: true → 重新抓取网页内容（使用trafilatura）
@@ -327,6 +328,14 @@ Content-Type: application/json
          ↓
 7. 清理 → 删除Queue表数据
 ```
+
+### 去重机制
+
+系统实现了基于URL的智能去重机制：
+
+- **接收时去重**: Webhook接收数据时，检查URL是否已存在于Queue表或Records表中
+- **处理时去重**: 队列处理时，再次检查URL是否已存在于Records表中
+- **双重保护**: 确保不会处理重复的内容，提高系统效率
 
 ### 内容抓取配置
 
