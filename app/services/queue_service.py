@@ -31,7 +31,7 @@ class QueueService:
                 queue_logger.info(f"URL已存在于队列中，跳过添加: {article_url}")
                 return 0
 
-            if self.record_service.repository.exists_by_url(article_url):
+            if self.record_service.record_repository.exists_by_url(article_url):
                 queue_logger.info(f"URL已存在于记录中，跳过添加: {article_url}")
                 return 0
 
@@ -62,7 +62,7 @@ class QueueService:
                 f"开始处理队列项: id={queue_item.id}, feed_url={queue_item.feed_url}")
 
             # 处理前再次检查去重（防止处理期间有重复数据）
-            if self.record_service.repository.exists_by_url(queue_item.article_url):
+            if self.record_service.record_repository.exists_by_url(queue_item.article_url):
                 queue_logger.info(
                     f"URL已存在于记录中，跳过处理并删除队列项: {queue_item.article_url}")
                 self.queue_repository.delete_queue_item(queue_item.id)
